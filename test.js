@@ -30,24 +30,7 @@ const main = async () => {
       type: 2
     };
 
-    console.log(tx)
-    return;
-    
-    if (tx == null) {
-        return;
-    }
-    const routerDataDecoded = await parseUniv2RouterTx(tx);
-    if (routerDataDecoded == null) {
-        return;
-    }
-    const { path, userAmountIn, amountOutMin } = routerDataDecoded;
-    if (path.length == 2) {
-        const fromToken = path[0];
-        const toToken = path[1];
-        const pair = getUniv2PairAddress(fromToken, toToken);
-        const [reserveFrom, reserveTo] = await getUniv2Reserve(pair, fromToken, toToken);
-        console.log(reserveFrom, reserveTo);
-    }
+    console.log(tx);
 };
 
 main();
