@@ -2,7 +2,7 @@ import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 import abiDecoder from "abi-decoder";
 import { ethers } from "ethers";
-import { UNIV2_ROUTER, TOKENS } from "./constants.js";
+import { ROUTERS, TOKENS } from "./constants.js";
 import { uniswapV2Pair } from "./config.js";
 
 const IUniswapV2RouterABI = require("./abi/IUniswapV2Router02.json");
@@ -33,7 +33,7 @@ export const match = (a, b, caseIncensitive = true) => {
 
 
 export const parseUniv2RouterTx = async (tx) => {
-  if (match(tx.to, UNIV2_ROUTER)) {
+  if (match(tx.to, ROUTERS.UNIV2_ROUTER)) {
     let data = null;
     try {
       data = abiDecoder.decodeMethod(tx.data);
