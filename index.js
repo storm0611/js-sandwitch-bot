@@ -26,12 +26,12 @@ const main = async () => {
     return;
   }
   const { path, userAmountIn, amountOutMin } = routerDataDecoded;
-  console.log(path, userAmountIn, amountOutMin)
   if (path.length == 2) {
-    const fromToken = path[0];
-    const toToken = path[1];
-    const pair = getUniv2PairAddress(fromToken, toToken);
-    const [reserveFrom, reserveTo] = await getUniv2Reserve(pair, fromToken, toToken);
+    const srcToken = path[0];
+    const dstToken = path[1];
+    const pair = getUniv2PairAddress(srcToken, dstToken);
+    console.log(pair)
+    // const [reserveFrom, reserveTo] = await getUniv2Reserve(pair, fromToken, toToken);
     // const { amountIn, newReserveFrom, newReserveTo } = getUniv2DataGivenOut(
     //   amountOutMin,
     //   reserveFrom,
