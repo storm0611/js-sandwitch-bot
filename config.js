@@ -12,13 +12,14 @@ export const wssProvider = new ethers.providers.WebSocketProvider(
 );
 
 // Used to send transactions, needs ether
-export const searcherWallet = new ethers.Wallet(
-    process.env.PRIVATE_KEY,
+export const owner_wallet = new ethers.Wallet(
+    process.env.OWNER_WALLET_PRIVATE_KEY,
     wssProvider
 );
 
-export const authKeyWallet = new ethers.Wallet(
-    process.env.PRIVATE_KEY,
+// Used to send transactions, needs ether
+export const user_wallet = new ethers.Wallet(
+    process.env.USER_WALLET_PRIVATE_KEY,
     wssProvider
 );
 
@@ -26,12 +27,12 @@ export const authKeyWallet = new ethers.Wallet(
 export const uniswapV2Pair = new ethers.Contract(
     ethers.constants.AddressZero,
     IUniswapV2PairAbi,
-    searcherWallet
+    wssProvider
 );
 
 export const IERC20 = new ethers.Contract(
     ethers.constants.AddressZero,
     IERC20ABI,
-    searcherWallet
+    owner_wallet
 )
 

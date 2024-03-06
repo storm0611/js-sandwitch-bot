@@ -1,5 +1,6 @@
 import { wssProvider } from "./config.js";
 import { getUniv2PairAddress, parseUniv2RouterTx, getUniv2Reserve, getUniv2DataGivenOut } from "./utils.js";
+import { ethers } from "ethers";
 
 const main = async () => {
 
@@ -9,6 +10,7 @@ const main = async () => {
   //   const tx = await wssProvider.getTransaction(txHash);
   //   console.log(tx)
   const tx = await wssProvider.getTransaction(TEST_TX);
+  console.log(tx)
     if (tx == null) {
       return;
     }
