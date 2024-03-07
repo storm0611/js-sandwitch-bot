@@ -128,26 +128,181 @@ export const getUniv2Reserve = async (pair, tokenA, tokenB) => {
 
  How much in do we get if we supply out?
 */
-export const getUniv2DataGivenOut = (bOut, reserveA, reserveB) => {
+export const getUniv2DataGivenOut = (bOut, reserveIn, reserveOut) => {
   // Underflow
-  let newReserveB = reserveB.sub(bOut);
-  if (newReserveB.lt(0) || reserveB.gt(reserveB)) {
-    newReserveB = ethers.BigNumber.from(1);
+  let newReserveOut = reserveOut.sub(bOut);
+  if (newReserveOut.lt(0) || reserveOut.gt(reserveOut)) {
+    newReserveOut = ethers.BigNumber.from(1);
   }
 
-  const numerator = reserveA.mul(bOut).mul(1000);
-  const denominator = newReserveB.mul(997);
+  const numerator = reserveIn.mul(bOut).mul(1000);
+  const denominator = newReserveOut.mul(997);
   const aAmountIn = numerator.div(denominator).add(ethers.constants.One);
 
   // Overflow
-  let newReserveA = reserveA.add(aAmountIn);
+  let newReserveIn = reserveIn.add(aAmountIn);
+  if (newReserveIn.lt(reserveIn)) {
+    newReserveIn = ethers.constants.MaxInt256;
+  }
+
+  return {
+    amountIn: aAmountIn,
+    newReserveIn,
+    newReserveOut,
+  };
+};
+
+function sqrt(value) {
+  const ONE = ethers.BigNumber.from(1);
+  const TWO = ethers.BigNumber.from(2);
+  let x = value;
+  let z = x.add(ONE).div(TWO);
+  let y = x;
+  while (z.sub(y).isNegative()) {
+    y = z;
+    z = x.div(z).add(z).div(TWO);
+  }
+  return y;
+}
+
+export const calcSandwichOptimalInWithNoSearch = (
+  userAmountIn,
+  userMinRecvToken,
+  reserveWeth,
+  reserveToken,
+  availabltAmountIn
+) => {
+  let UMR = ethers.utils.parseUnits(String(userMinRecvToken), 'wei');
+  if (UMR.toString() == "0") {
+    UMR = UMR.add(1);
+  }
+
+  let A = reserveToken.mul(reserveWeth).mul(userAmountIn).mul(997).mul(1000);
+  let B = userAmountIn.mul(997).add(reserveWeth.mul(1000));
+  let C = reserveWeth.mul(UMR).mul(1000);
+
+  let AA = UMR.mul(ethers.utils.parseUnits('997000', 'wei'));
+  let BB = B.mul(997).mul(UMR).add(C.mul(1000));
+  let CC = B.mul(C).sub(A);
+
+
+  let D = BB.mul(BB).sub(CC.mul(AA).mul(4));
+  let x = sqrt(D).sub(BB).div(AA.mul(2));
+
+  console.log(`Original x = ${ethers.BigNumber.from(x).toString()}`);
+
+  if (x.gt(ethers.utils.parseEther(availabltAmountIn.toString()))) {
+    x = ethers.utils.parseEther(availabltAmountIn.toString());
+  }
+  console.log(`Available x = ${ethers.BigNumber.from(x).toString()}`);
+  return x;
+}
+
+/*
+ Uniswap v2; x * y = k formula
+
+ How much out do we get if we supply in?
+*/
+export const getUniv2DataGivenIn = (aIn, reserveA, reserveB) => {
+  const aInWithFee = aIn.mul(997);
+  const numerator = aInWithFee.mul(reserveB);
+  const denominator = aInWithFee.add(reserveA.mul(1000));
+  const bOut = numerator.div(denominator);
+
+  // Underflow
+  let newReserveB = reserveB.sub(bOut);
+  if (newReserveB.lt(0) || newReserveB.gt(reserveB)) {
+    newReserveB = ethers.BigNumber.from(1);
+  }
+
+  // Overflow
+  let newReserveA = reserveA.add(aIn);
   if (newReserveA.lt(reserveA)) {
     newReserveA = ethers.constants.MaxInt256;
   }
 
   return {
-    amountIn: aAmountIn,
+    amountOut: bOut,
     newReserveA,
     newReserveB,
   };
+};
+
+export const calcSandwichState = (
+  optimalSandwichWethIn,
+  userWethIn,
+  userMinRecv,
+  reserveWeth,
+  reserveToken
+) => {
+  const frontrunState = getUniv2DataGivenIn(
+    optimalSandwichWethIn,
+    reserveWeth,
+    reserveToken
+  );
+  const victimState = getUniv2DataGivenIn(
+    userWethIn,
+    frontrunState.newReserveA,
+    frontrunState.newReserveB
+  );
+
+  let backrunState = getUniv2DataGivenIn(
+    frontrunState.amountOut,
+    victimState.newReserveB,
+    victimState.newReserveA
+  );
+
+  const minimumBackrunState = getUniv2DataGivenOut(
+    backrunState.amountOut,
+    victimState.newReserveB,
+    victimState.newReserveA
+  );
+
+  let realTokenAmountIn = frontrunState.amountOut;
+
+  backrunState = getUniv2DataGivenIn(
+    realTokenAmountIn,
+    victimState.newReserveB,
+    victimState.newReserveA
+  );
+
+  // Sanity check
+  if (victimState.amountOut.lt(userMinRecv)) {
+    return null;
+  }
+
+  // Return
+  return {
+    // NOT PROFIT
+    // Profit = post gas
+    revenue: backrunState.amountOut.sub(optimalSandwichWethIn),
+    optimalSandwichWethIn,
+    userAmountIn: userWethIn,
+    userMinRecv,
+    reserveState: {
+      reserveWeth,
+      reserveToken,
+    },
+    frontrun: frontrunState,
+    victim: victimState,
+    backrun: backrunState,
+    backSliceIn: realTokenAmountIn
+  };
+};
+
+
+export const calcNextBlockBaseFee = (curBlock) => {
+  const baseFee = curBlock.baseFeePerGas;
+  const gasUsed = curBlock.gasUsed;
+  const targetGasUsed = curBlock.gasLimit.div(2);
+  const delta = gasUsed.sub(targetGasUsed);
+
+  const newBaseFee = baseFee.add(
+    baseFee.mul(delta).div(targetGasUsed).div(ethers.BigNumber.from(8))
+  );
+
+  // Add 0-9 wei so it becomes a different hash each time
+  // const rand = Math.floor(Math.random() * 10);
+  // return newBaseFee.add(rand);
+  return newBaseFee;
 };
