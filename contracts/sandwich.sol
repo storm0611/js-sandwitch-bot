@@ -9,12 +9,14 @@ contract StormSandwich {
 
     // Authorized
     address internal immutable user;
+    address internal immutable WETH;
 
     // Contructor sets the only user
     receive() external payable {}
 
-    constructor(address _owner) {
-        user = _owner;
+    constructor(address _weth) {
+        user = msg.sender;
+        WETH = _weth;
     }
 
     // *** Receive profits from contract *** //
@@ -26,11 +28,22 @@ contract StormSandwich {
         );
     }
 
-    // *** Deposit ERC20(WETH) token to contract *** //
-    function dipositeERC20(address token) public payable {
+    function withdrawETH() public {
         require(msg.sender == user, "shoo");
-        IERC20(token).deposit{value: msg.value}();
+        payable(user).transfer(address(this).balance);
     }
+
+    // *** Deposit ERC20(WETH) token to contract *** //
+    function dipositeWETH() public payable {
+        require(msg.sender == user, "shoo");
+        IERC20(WETH).deposit{value: msg.value}();
+    }
+
+    // *** Deposit ERC20(WETH) token to contract *** //
+    // function dipositeERC20(address token, uint256 amount) public payable {
+    //     require(msg.sender == user, "shoo");
+    //     IERC20(token).transferFrom(msg.sender, address(this), amount);
+    // }
 
     // *** Buy token with src token(WETH) *** //
     function buyToken(address token, address pair, uint256 amountIn, uint256 tokenOutNo) external {
